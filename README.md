@@ -11,33 +11,33 @@ Spring Boot(+React) 기반, 2~3일 내 구현을 목표로 한 바이브 코딩 
 
 ## 스코프 (CRUD)
 
-| 기능 | 설명 |
-|---|---|
+| 기능   | 설명                                                                           |
+| ------ | ------------------------------------------------------------------------------ |
 | Create | URL 입력 → 콘텐츠 타입 판별 → 본문/메타데이터 수집 → LLM 요약·태그 생성 → 저장 |
-| Read | 목록 조회, `contentType`/태그 필터, 키워드 검색(제목/메모) |
-| Update | 제목/메모/태그 인라인 수정 (LLM 결과 보정용) |
-| Delete | 북마크 삭제 |
+| Read   | 목록 조회, `contentType`/태그 필터, 키워드 검색(제목/메모)                     |
+| Update | 제목/메모/태그 인라인 수정 (LLM 결과 보정용)                                   |
+| Delete | 북마크 삭제                                                                    |
 
 ## 엔티티 설계
 
 ### Bookmark
 
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| id | Long (PK) | |
-| url | String, not null | 원본 URL |
-| title | String, not null | 사용자 입력 우선, 없으면 LLM 생성값 |
-| memo | String, nullable | 사용자 메모 |
-| summary | String(TEXT) | LLM 생성 3줄 요약 |
-| contentType | Enum(ARTICLE, GITHUB, VIDEO, IMAGE, DOCUMENT, OTHER) | 서버가 URL로 판별 |
-| createdAt | LocalDateTime | 자동 기록 |
-| updatedAt | LocalDateTime | 인라인 수정 시 갱신 |
+| 필드        | 타입                                                 | 설명                                |
+| ----------- | ---------------------------------------------------- | ----------------------------------- |
+| id          | Long (PK)                                            |                                     |
+| url         | String, not null                                     | 원본 URL                            |
+| title       | String, not null                                     | 사용자 입력 우선, 없으면 LLM 생성값 |
+| memo        | String, nullable                                     | 사용자 메모                         |
+| summary     | String(TEXT)                                         | LLM 생성 3줄 요약                   |
+| contentType | Enum(ARTICLE, GITHUB, VIDEO, IMAGE, DOCUMENT, OTHER) | 서버가 URL로 판별                   |
+| createdAt   | LocalDateTime                                        | 자동 기록                           |
+| updatedAt   | LocalDateTime                                        | 인라인 수정 시 갱신                 |
 
 ### Tag
 
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| id | Long (PK) | |
+| 필드 | 타입                     | 설명                        |
+| ---- | ------------------------ | --------------------------- |
+| id   | Long (PK)                |                             |
 | name | String, unique, not null | 정규화(소문자/trim) 후 저장 |
 
 ### 관계
@@ -48,12 +48,12 @@ Spring Boot(+React) 기반, 2~3일 내 구현을 목표로 한 바이브 코딩 
 
 ## API 명세
 
-| 메서드 | 경로 | 설명 | 요청 | 응답 |
-|---|---|---|---|---|
-| POST | /api/bookmarks | URL 저장 + LLM 요약/태그 생성 | `{ url, title?, memo? }` | `BookmarkResponse` |
-| GET | /api/bookmarks | 목록 조회 | 쿼리파람: contentType, tag, keyword | `List<BookmarkResponse>` |
-| PATCH | /api/bookmarks/{id} | 제목/메모/태그 인라인 수정 | `{ title?, memo?, tags? }` | `BookmarkResponse` |
-| DELETE | /api/bookmarks/{id} | 삭제 | - | 204 |
+| 메서드 | 경로                | 설명                          | 요청                                | 응답                     |
+| ------ | ------------------- | ----------------------------- | ----------------------------------- | ------------------------ |
+| POST   | /api/bookmarks      | URL 저장 + LLM 요약/태그 생성 | `{ url, title?, memo? }`            | `BookmarkResponse`       |
+| GET    | /api/bookmarks      | 목록 조회                     | 쿼리파람: contentType, tag, keyword | `List<BookmarkResponse>` |
+| PATCH  | /api/bookmarks/{id} | 제목/메모/태그 인라인 수정    | `{ title?, memo?, tags? }`          | `BookmarkResponse`       |
+| DELETE | /api/bookmarks/{id} | 삭제                          | -                                   | 204                      |
 
 ### BookmarkResponse 예시
 
@@ -119,15 +119,16 @@ src/main/java/.../bookmark
 - 향후 확장 시: `Bookmark`에 `userId` 컬럼 추가 + Spring Security/JWT 도입으로 멀티유저 전환 가능
 
 ## Configuration
-- application.yml 사용 (properties 아님) — 계층 구조가 있어서 datasource/jpa 설정 읽기 편함
+
+- application.yaml 사용 (properties 아님) — 계층 구조가 있어서 datasource/jpa 설정 읽기 편함
 - spring.jpa.hibernate.ddl-auto: update — 엔티티 수정할 때마다 스키마 자동 반영
 - spring.h2.console.enabled: true — 브라우저에서 /h2-console로 DB 상태 바로 확인 가능, 디버깅 속도에 큰 도움
 - spring.datasource.url: jdbc:h2:mem:bookmarkdb — 인메모리, 재시작하면 데이터 날아가는 건 감안(로컬 개발 단계라 문제없음)
-- CORS 설정 미리 추가: React가 다른 포트(3000 등)에서 호출하니 WebMvcConfigurer로 /api/**에 대해 localhost:3000 허용 — 나중에 프론트 연결할 때 이거 안 해두면 원인 모를 에러로 시간 날림
+- CORS 설정 미리 추가: React가 다른 포트(3000 등)에서 호출하니 WebMvcConfigurer로 /api/\*\*에 대해 localhost:3000 허용 — 나중에 프론트 연결할 때 이거 안 해두면 원인 모를 에러로 시간 날림
 - 로그 레벨은 org.hibernate.SQL: debug 정도 켜두면 JPA가 실제로 어떤 쿼리 날리는지 보여서 AI가 짠 쿼리 검증하기 편함
 
-
 ## TODO
+
 - 엔티티 설계, Spring Boot REST API(CRUD), DB(H2/MySQL) 구성 |
 - React 카드형 목록 UI, 태그/contentType 필터, 검색, API 연동 |
 - URL fetch + LLM 요약/태그 생성 연동, 예외처리 |
