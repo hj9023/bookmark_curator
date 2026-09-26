@@ -41,8 +41,7 @@ class BookmarkControllerTest {
     private BookmarkService bookmarkService;
 
     private Bookmark createSampleBookmark(Long id, String url, String title, ContentType contentType) {
-        return Bookmark.builder()
-                .id(id)
+        Bookmark bookmark = Bookmark.builder()
                 .url(url)
                 .title(title)
                 .memo("테스트 메모")
@@ -50,6 +49,8 @@ class BookmarkControllerTest {
                 .contentType(contentType)
                 .tags(Set.of(new Tag("spring"), new Tag("ai")))
                 .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(bookmark, "id", id);
+        return bookmark;
     }
 
     @Test
