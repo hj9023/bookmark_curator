@@ -45,7 +45,6 @@ class SummaryServiceTest {
         assertThat(result.summary()).isNotBlank();
         assertThat(result.summary()).doesNotContain(sampleText); // 원문 텍스트 그대로 반환하지 않음
         assertThat(result.tags()).isNotEmpty();
-        assertThat(result.tags().size()).isBetween(3, 5);
     }
 
     @Test

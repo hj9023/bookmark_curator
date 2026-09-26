@@ -66,9 +66,10 @@ public class ContentFetchService {
         String path = lowerUrl.split("\\?")[0];
         boolean isDocFile = path.endsWith(".pdf") || path.endsWith(".docx") || path.endsWith(".doc")
                 || path.endsWith(".txt") || path.endsWith(".md") || path.endsWith(".pptx");
-        boolean isDocPath = lowerUrl.contains("/docs/") || lowerUrl.contains("/documentation/")
-                || lowerUrl.contains("/wiki/") || lowerUrl.contains("/guide/")
-                || lowerUrl.contains("/manual/") || lowerUrl.contains("/reference/");
+        boolean isDocPath = lowerUrl.contains("/docs") || lowerUrl.contains("docs.")
+                || lowerUrl.contains("/documentation") || lowerUrl.contains("/wiki")
+                || lowerUrl.contains("/guide") || lowerUrl.contains("/manual")
+                || lowerUrl.contains("/reference");
         return isDocFile || isDocPath;
     }
 

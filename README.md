@@ -15,23 +15,23 @@ Spring Boot(+React) 기반, 2~3일 내 구현을 목표로 한 바이브 코딩 
 | ------ | ------------------------------------------------------------------------------ |
 | Create | URL 입력 → 콘텐츠 타입 판별 → 본문/메타데이터 수집 → LLM 요약·태그 생성 → 저장 |
 | Read   | 목록 조회, `contentType`/태그 필터, 키워드 검색(제목/메모)                     |
-| Update | 제목/메모/태그 인라인 수정 (LLM 결과 보정용)                                   |
+| Update | 제목/메모/태그/콘텐츠타입 인라인 수정 (LLM 결과 및 타입 보정용)                |
 | Delete | 북마크 삭제                                                                    |
 
 ## 엔티티 설계
 
 ### Bookmark
 
-| 필드        | 타입                                                 | 설명                                |
-| ----------- | ---------------------------------------------------- | ----------------------------------- |
-| id          | Long (PK)                                            |                                     |
-| url         | String, not null                                     | 원본 URL                            |
-| title       | String, not null                                     | 사용자 입력 우선, 없으면 LLM 생성값 |
-| memo        | String, nullable                                     | 사용자 메모                         |
-| summary     | String(TEXT)                                         | LLM 생성 3줄 요약                   |
-| contentType | Enum(ARTICLE, GITHUB, VIDEO, IMAGE, DOCUMENT, OTHER) | 서버가 URL로 판별                   |
-| createdAt   | LocalDateTime                                        | 자동 기록                           |
-| updatedAt   | LocalDateTime                                        | 인라인 수정 시 갱신                 |
+| 필드        | 타입                                                 | 설명                                       |
+| ----------- | ---------------------------------------------------- | ------------------------------------------ |
+| id          | Long (PK)                                            |                                            |
+| url         | String, not null                                     | 원본 URL                                   |
+| title       | String, not null                                     | 사용자 입력 우선, 없으면 LLM 생성값        |
+| memo        | String, nullable                                     | 사용자 메모                                |
+| summary     | String(TEXT)                                         | LLM 생성 3줄 요약                          |
+| contentType | Enum(ARTICLE, GITHUB, VIDEO, IMAGE, DOCUMENT, OTHER) | 서버가 URL로 자동 판별 (수정 시 변경 가능) |
+| createdAt   | LocalDateTime                                        | 자동 기록                                  |
+| updatedAt   | LocalDateTime                                        | 인라인 수정 시 갱신                        |
 
 ### Tag
 
@@ -48,12 +48,12 @@ Spring Boot(+React) 기반, 2~3일 내 구현을 목표로 한 바이브 코딩 
 
 ## API 명세
 
-| 메서드 | 경로                | 설명                          | 요청                                | 응답                     |
-| ------ | ------------------- | ----------------------------- | ----------------------------------- | ------------------------ |
-| POST   | /api/bookmarks      | URL 저장 + LLM 요약/태그 생성 | `{ url, title?, memo? }`            | `BookmarkResponse`       |
-| GET    | /api/bookmarks      | 목록 조회                     | 쿼리파람: contentType, tag, keyword | `List<BookmarkResponse>` |
-| PATCH  | /api/bookmarks/{id} | 제목/메모/태그 인라인 수정    | `{ title?, memo?, tags? }`          | `BookmarkResponse`       |
-| DELETE | /api/bookmarks/{id} | 삭제                          | -                                   | 204                      |
+| 메서드 | 경로                | 설명                            | 요청                                     | 응답                     |
+| ------ | ------------------- | ------------------------------- | ---------------------------------------- | ------------------------ |
+| POST   | /api/bookmarks      | URL 저장 + LLM 요약/태그 생성   | `{ url, title?, memo? }`                 | `BookmarkResponse`       |
+| GET    | /api/bookmarks      | 목록 조회                       | 쿼리파람: contentType, tag, keyword      | `List<BookmarkResponse>` |
+| PATCH  | /api/bookmarks/{id} | 제목/메모/태그/타입 인라인 수정 | `{ title?, memo?, tags?, contentType? }` | `BookmarkResponse`       |
+| DELETE | /api/bookmarks/{id} | 삭제                            | -                                        | 204                      |
 
 ### BookmarkResponse 예시
 

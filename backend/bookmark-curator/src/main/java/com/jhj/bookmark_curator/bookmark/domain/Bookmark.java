@@ -87,14 +87,20 @@ public class Bookmark {
         }
     }
 
-    public void update(String title, String memo, Set<Tag> tags) {
-        if (title != null) {
+    public void update(String title, String memo, ContentType contentType, Set<Tag> tags) {
+        if (title != null && !title.isBlank()) {
             this.title = title;
         }
-        this.memo = memo;
+        if (memo != null) {
+            this.memo = memo;
+        }
+        if (contentType != null) {
+            this.contentType = contentType;
+        }
         if (tags != null) {
             this.tags.clear();
             this.tags.addAll(tags);
         }
     }
 }
+
