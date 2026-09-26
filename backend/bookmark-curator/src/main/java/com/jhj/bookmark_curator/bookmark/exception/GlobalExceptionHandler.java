@@ -37,6 +37,14 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(errorCode));
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(org.springframework.web.bind.MethodArgumentNotValidException e) {
+        log.warn("MethodArgumentNotValidException: {}", e.getMessage());
+        return ResponseEntity
+                .status(ErrorCode.INVALID_URL.getHttpStatus())
+                .body(ErrorResponse.of(ErrorCode.INVALID_URL));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("IllegalArgumentException: {}", e.getMessage());

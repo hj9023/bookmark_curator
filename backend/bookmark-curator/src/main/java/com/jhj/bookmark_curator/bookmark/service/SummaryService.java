@@ -1,5 +1,6 @@
 package com.jhj.bookmark_curator.bookmark.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jhj.bookmark_curator.bookmark.domain.ContentType;
 import com.jhj.bookmark_curator.bookmark.exception.ErrorCode;
 import com.jhj.bookmark_curator.bookmark.exception.SummaryGenerationException;
@@ -49,12 +50,13 @@ public class SummaryService {
     @Value("${groq.url:https://api.groq.com/openai/v1/chat/completions}")
     private String apiUrl;
 
-    @Value("${groq.model:llama-3.3-70b-versatile}")
+    @Value("${groq.model:openai/gpt-oss-120b}")
     private String model;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SummaryService(ObjectMapper objectMapper) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(10));

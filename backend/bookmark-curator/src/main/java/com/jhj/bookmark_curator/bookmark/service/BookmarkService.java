@@ -4,6 +4,7 @@ import com.jhj.bookmark_curator.bookmark.domain.Bookmark;
 import com.jhj.bookmark_curator.bookmark.domain.ContentType;
 import com.jhj.bookmark_curator.bookmark.domain.Tag;
 import com.jhj.bookmark_curator.bookmark.exception.BookmarkNotFoundException;
+import com.jhj.bookmark_curator.bookmark.exception.InvalidUrlException;
 import com.jhj.bookmark_curator.bookmark.repository.BookmarkRepository;
 import com.jhj.bookmark_curator.bookmark.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ public class BookmarkService {
 
     public Bookmark create(String url, String title, String memo) {
         if (url == null || url.isBlank()) {
-            throw new IllegalArgumentException("URL은 필수입니다.");
+            throw new InvalidUrlException("URL은 필수입니다.");
         }
 
         // 1. ContentFetchService로 콘텐츠 수집 및 contentType 판별
@@ -55,6 +56,13 @@ public class BookmarkService {
                 .build();
 
         return bookmarkRepository.save(bookmark);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Bookmark> findAll(ContentType contentType, String tag, String keyword) {
+        String normalizedTag = (tag != null && !tag.isBlank()) ? Tag.normalize(tag) : null;
+        String trimmedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+        return bookmarkRepository.search(contentType, normalizedTag, trimmedKeyword);
     }
 
     public Bookmark update(Long id, String title, String memo, ContentType contentType, List<String> tagNames) {
