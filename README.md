@@ -70,6 +70,27 @@ Spring Boot(+React) 기반, 2~3일 내 구현을 목표로 한 바이브 코딩 
 }
 ```
 
+### 에러 응답 규격 (ErrorResponse)
+
+모든 API 에러는 일관된 JSON 형태와 적절한 HTTP 상태 코드로 반환됩니다.
+
+```json
+{
+  "code": "BOOKMARK_NOT_FOUND",
+  "message": "북마크를 찾을 수 없습니다"
+}
+```
+
+### ErrorCode 명세
+
+| ErrorCode                   | HTTP Status           | 설명                                                    |
+| :-------------------------- | :-------------------- | :------------------------------------------------------ |
+| `INVALID_URL`               | 400 Bad Request       | 유효하지 않은 URL입니다                                 |
+| `BOOKMARK_NOT_FOUND`        | 404 Not Found         | 북마크를 찾을 수 없습니다                               |
+| `SUMMARY_RATE_LIMITED`      | 429 Too Many Requests | Groq 요청 한도를 초과했습니다                           |
+| `SUMMARY_GENERATION_FAILED` | 502 Bad Gateway       | 요약 생성에 실패했습니다 (인증 실패, 5xx, 파싱 오류 등) |
+| `SUMMARY_TIMEOUT`           | 504 Gateway Timeout   | 요약 생성 응답이 지연되고 있습니다 (타임아웃)           |
+
 ## 콘텐츠 타입 판별 & 요약 파이프라인
 
 1. **타입 판별 (코드, LLM 미사용)**
@@ -107,7 +128,14 @@ src/main/java/.../bookmark
  │    └── SummaryService.java        // LLM 호출 (요약/태그 생성)
  ├── repository/BookmarkRepository.java, TagRepository.java
  ├── domain/Bookmark.java, Tag.java, ContentType.java(enum)
- └── dto/BookmarkRequest.java, BookmarkResponse.java
+ ├── dto/BookmarkRequest.java, BookmarkResponse.java
+ └── exception/
+      ├── ErrorCode.java              // 에러 코드 및 HTTP 상태 매핑 Enum
+      ├── ErrorResponse.java          // 클라이언트 반환 통일 DTO
+      ├── GlobalExceptionHandler.java // @RestControllerAdvice 전역 예외 처리
+      ├── BookmarkNotFoundException.java
+      ├── SummaryGenerationException.java
+      └── InvalidUrlException.java
 ```
 
 프론트엔드(React): `components/`, `pages/`, `api/` 기본 구조.

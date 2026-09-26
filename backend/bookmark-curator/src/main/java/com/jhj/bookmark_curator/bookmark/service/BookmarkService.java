@@ -3,6 +3,7 @@ package com.jhj.bookmark_curator.bookmark.service;
 import com.jhj.bookmark_curator.bookmark.domain.Bookmark;
 import com.jhj.bookmark_curator.bookmark.domain.ContentType;
 import com.jhj.bookmark_curator.bookmark.domain.Tag;
+import com.jhj.bookmark_curator.bookmark.exception.BookmarkNotFoundException;
 import com.jhj.bookmark_curator.bookmark.repository.BookmarkRepository;
 import com.jhj.bookmark_curator.bookmark.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,7 @@ public class BookmarkService {
 
     public Bookmark update(Long id, String title, String memo, ContentType contentType, List<String> tagNames) {
         Bookmark bookmark = bookmarkRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("북마크를 찾을 수 없습니다. id=" + id));
+                .orElseThrow(() -> new BookmarkNotFoundException(id));
 
         // URL과 summary는 수정 불가 (title, memo, contentType, tags 수정 가능)
         Set<Tag> updatedTags = tagNames != null ? resolveTags(tagNames) : null;
@@ -69,7 +70,7 @@ public class BookmarkService {
 
     public void delete(Long id) {
         Bookmark bookmark = bookmarkRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("북마크를 찾을 수 없습니다. id=" + id));
+                .orElseThrow(() -> new BookmarkNotFoundException(id));
 
         // 조인 테이블만 정리되고 연결된 Tag 엔티티 자체는 삭제되지 않음
         bookmarkRepository.delete(bookmark);

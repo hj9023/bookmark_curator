@@ -3,6 +3,7 @@ package com.jhj.bookmark_curator.bookmark.service;
 import com.jhj.bookmark_curator.bookmark.domain.Bookmark;
 import com.jhj.bookmark_curator.bookmark.domain.ContentType;
 import com.jhj.bookmark_curator.bookmark.domain.Tag;
+import com.jhj.bookmark_curator.bookmark.exception.BookmarkNotFoundException;
 import com.jhj.bookmark_curator.bookmark.repository.BookmarkRepository;
 import com.jhj.bookmark_curator.bookmark.repository.TagRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -177,5 +179,23 @@ class BookmarkServiceTest {
         verify(bookmarkRepository).delete(existingBookmark);
         // TagRepository의 delete는 호출되지 않음 (Tag 엔티티 자체는 보존)
         verify(tagRepository, never()).delete(any(Tag.class));
+    }
+
+    @Test
+    @DisplayName("update: 존재하지 않는 id 조회 시 BookmarkNotFoundException을 던진다")
+    void updateThrowsBookmarkNotFoundException() {
+        given(bookmarkRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookmarkService.update(999L, "제목", "메모", ContentType.ARTICLE, null))
+                .isInstanceOf(BookmarkNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("delete: 존재하지 않는 id 조회 시 BookmarkNotFoundException을 던진다")
+    void deleteThrowsBookmarkNotFoundException() {
+        given(bookmarkRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookmarkService.delete(999L))
+                .isInstanceOf(BookmarkNotFoundException.class);
     }
 }

@@ -1,15 +1,20 @@
 package com.jhj.bookmark_curator.bookmark.service;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import com.jhj.bookmark_curator.bookmark.domain.ContentType;
+import com.jhj.bookmark_curator.bookmark.exception.ErrorCode;
+import com.jhj.bookmark_curator.bookmark.exception.SummaryGenerationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,8 +56,20 @@ public class SummaryService {
     private final ObjectMapper objectMapper;
 
     public SummaryService(ObjectMapper objectMapper) {
-        this.restClient = RestClient.builder().build();
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(30));
+
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
         this.objectMapper = objectMapper;
+    }
+
+    // 테스트용 생성자
+    SummaryService(ObjectMapper objectMapper, RestClient restClient) {
+        this.objectMapper = objectMapper;
+        this.restClient = restClient;
     }
 
     public SummaryResult summarize(ContentType contentType, String content) {
@@ -82,10 +99,46 @@ public class SummaryService {
                     .body(String.class);
 
             return parseSummaryResult(responseBody);
+        } catch (HttpStatusCodeException e) {
+            log.error("Groq API HTTP error [{}]: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            if (e.getStatusCode().value() == 429) {
+                throw new SummaryGenerationException(ErrorCode.SUMMARY_RATE_LIMITED, e);
+            }
+            if (e.getStatusCode().value() == 504) {
+                throw new SummaryGenerationException(ErrorCode.SUMMARY_TIMEOUT, e);
+            }
+            throw new SummaryGenerationException(ErrorCode.SUMMARY_GENERATION_FAILED, e);
+        } catch (ResourceAccessException e) {
+            log.error("Groq API 네트워크/접근 오류: {}", e.getMessage(), e);
+            if (isTimeout(e)) {
+                throw new SummaryGenerationException(ErrorCode.SUMMARY_TIMEOUT, e);
+            }
+            throw new SummaryGenerationException(ErrorCode.SUMMARY_GENERATION_FAILED, e);
+        } catch (SummaryGenerationException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Groq API 요약 생성 실패: {}", e.getMessage(), e);
-            return new SummaryResult("요약 생성에 실패했습니다. (사유: " + e.getMessage() + ")", List.of("오류"));
+            log.error("Groq API 요약 처리 실패: {}", e.getMessage(), e);
+            if (isTimeout(e)) {
+                throw new SummaryGenerationException(ErrorCode.SUMMARY_TIMEOUT, e);
+            }
+            throw new SummaryGenerationException(ErrorCode.SUMMARY_GENERATION_FAILED, e);
         }
+    }
+
+    private boolean isTimeout(Throwable t) {
+        if (t == null) {
+            return false;
+        }
+        if (t instanceof java.net.SocketTimeoutException
+                || t instanceof java.net.http.HttpTimeoutException
+                || t instanceof java.util.concurrent.TimeoutException) {
+            return true;
+        }
+        String msg = t.getMessage();
+        if (msg != null && msg.toLowerCase().contains("timeout")) {
+            return true;
+        }
+        return isTimeout(t.getCause());
     }
 
     private SummaryResult parseSummaryResult(String responseBody) throws Exception {
