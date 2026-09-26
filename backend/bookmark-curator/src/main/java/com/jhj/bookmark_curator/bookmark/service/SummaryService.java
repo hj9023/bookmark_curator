@@ -1,0 +1,127 @@
+package com.jhj.bookmark_curator.bookmark.service;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jhj.bookmark_curator.bookmark.domain.ContentType;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+public class SummaryService {
+
+    private static final String PROMPT_TEMPLATE = """
+            당신은 웹 콘텐츠를 요약하고 핵심 태그를 추출하는 AI 어시스턴트입니다.
+            제공된 콘텐츠 타입과 텍스트를 분석하여 2~3줄 요약과 핵심 태그(3~5개)를 생성해주세요.
+
+            [콘텐츠 타입]
+            {contentType}
+
+            [수집된 텍스트]
+            {수집된 텍스트}
+
+            [요구사항]
+            1. summary는 핵심 내용을 한국어로 2~3줄(문장)로 요약해주세요. 원문을 그대로 복사하지 말고 핵심을 간결히 요약하세요.
+            2. tags는 콘텐츠를 대표하는 핵심 키워드 3~5개를 한국어 또는 널리 쓰이는 영문 기술용어로 추출해주세요.
+            3. 반드시 아래의 JSON 형식으로만 응답해야 합니다. 마크다운 코드블록(```json 등)이나 기타 설명 문장 없이 순수 JSON 객체만 반환하세요:
+            {
+              "summary": "2~3줄 요약 내용",
+              "tags": ["태그1", "태그2", "태그3"]
+            }
+            """;
+
+    @Value("${groq.api-key}")
+    private String apiKey;
+
+    @Value("${groq.url:https://api.groq.com/openai/v1/chat/completions}")
+    private String apiUrl;
+
+    @Value("${groq.model:llama-3.3-70b-versatile}")
+    private String model;
+
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+
+    public SummaryService(ObjectMapper objectMapper) {
+        this.restClient = RestClient.builder().build();
+        this.objectMapper = objectMapper;
+    }
+
+    public SummaryResult summarize(ContentType contentType, String content) {
+        if (content == null || content.isBlank()) {
+            return new SummaryResult("요약할 콘텐츠가 없습니다. 메모를 직접 입력해주세요.", List.of("미분류"));
+        }
+
+        try {
+            // README 원칙: {contentType}, {수집된 텍스트} 변수 치환
+            String prompt = PROMPT_TEMPLATE
+                    .replace("{contentType}", contentType != null ? contentType.name() : ContentType.OTHER.name())
+                    .replace("{수집된 텍스트}", content);
+
+            Map<String, Object> requestBody = Map.of(
+                    "model", model,
+                    "messages", List.of(Map.of("role", "user", "content", prompt)),
+                    "response_format", Map.of("type", "json_object"),
+                    "temperature", 0.3
+            );
+
+            String responseBody = restClient.post()
+                    .uri(apiUrl)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(String.class);
+
+            return parseSummaryResult(responseBody);
+        } catch (Exception e) {
+            log.error("Groq API 요약 생성 실패: {}", e.getMessage(), e);
+            return new SummaryResult("요약 생성에 실패했습니다. (사유: " + e.getMessage() + ")", List.of("오류"));
+        }
+    }
+
+    private SummaryResult parseSummaryResult(String responseBody) throws Exception {
+        JsonNode root = objectMapper.readTree(responseBody);
+        JsonNode choices = root.path("choices");
+        if (choices.isEmpty()) {
+            throw new IllegalStateException("Groq API 응답에 choices가 없습니다.");
+        }
+
+        String rawJson = choices.get(0).path("message").path("content").asText();
+        rawJson = cleanJsonString(rawJson);
+
+        SummaryJsonDto dto = objectMapper.readValue(rawJson, SummaryJsonDto.class);
+        List<String> tags = dto.tags() != null ? dto.tags() : Collections.emptyList();
+        return new SummaryResult(dto.summary(), tags);
+    }
+
+    private String cleanJsonString(String raw) {
+        if (raw == null) {
+            return "{}";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("```json")) {
+            trimmed = trimmed.substring(7);
+        } else if (trimmed.startsWith("```")) {
+            trimmed = trimmed.substring(3);
+        }
+        if (trimmed.endsWith("```")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 3);
+        }
+        return trimmed.trim();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record SummaryJsonDto(
+            String summary,
+            List<String> tags
+    ) {}
+}
