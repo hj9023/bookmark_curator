@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { updateBookmark } from "../api/bookmarkApi";
+import { updateBookmark, deleteBookmark } from "../api/bookmarkApi";
 
 const TYPE_BADGE_STYLES = {
   ARTICLE: "bg-blue-50 text-blue-700 border-blue-200",
@@ -12,7 +12,7 @@ const TYPE_BADGE_STYLES = {
 
 const CONTENT_TYPES = ["ARTICLE", "GITHUB", "VIDEO", "IMAGE", "DOCUMENT", "OTHER"];
 
-export default function BookmarkCard({ bookmark, onBookmarkUpdated }) {
+export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDeleted }) {
   const { id, url, title, memo, summary, contentType, tags = [] } = bookmark;
 
   // 카드 상태: 펼침 여부 (보기 모드용) & 수정 모드 여부
@@ -25,8 +25,9 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated }) {
   const [editTags, setEditTags] = useState((tags || []).join(", "));
   const [editContentType, setEditContentType] = useState(contentType);
 
-  // 수정 요청 상태 및 에러
+  // 비동기 요청 상태 및 에러
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
   // 수정 모드 진입
@@ -88,16 +89,40 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated }) {
       setIsEditing(false);
     } catch (err) {
       console.error("북마크 수정 실패:", err);
-      // 실패 시: 인라인 에러 배너 표시
       setErrorMessage(err.message || "북마크 수정 중 오류가 발생했습니다.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = (e) => {
+  // 북마크 삭제 (DELETE /api/bookmarks/{id})
+  const handleDelete = async (e) => {
     e.stopPropagation();
-    console.log("삭제 클릭:", id);
+
+    // 1. window.confirm 확인창
+    const confirmed = window.confirm("정말 삭제하시겠습니까?");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setErrorMessage(null);
+
+      // 2. DELETE /api/bookmarks/{id} 호출
+      await deleteBookmark(id);
+
+      // 3. 성공 시: 부모에게 삭제된 id 전달하여 배열에서 제거
+      if (onBookmarkDeleted) {
+        onBookmarkDeleted(id);
+      }
+    } catch (err) {
+      console.error("북마크 삭제 실패:", err);
+      // 4. 실패 시: ErrorResponse.message를 인라인 배너로 표시
+      setErrorMessage(err.message || "북마크 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const toggleExpand = () => {
@@ -257,6 +282,26 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated }) {
       className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-gray-300 transition-all cursor-pointer select-none"
     >
       <div>
+        {/* 삭제 에러 등 인라인 에러 배너 (보기 모드) */}
+        {errorMessage && (
+          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-red-500">⚠️</span>
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setErrorMessage(null);
+              }}
+              className="text-red-400 hover:text-red-600 text-xs font-bold px-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* 상단: 타입 뱃지 및 펼침 힌트 */}
         <div className="flex items-center justify-between mb-3">
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeStyle}`}>{contentType}</span>
@@ -321,16 +366,22 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated }) {
           <button
             type="button"
             onClick={handleStartEdit}
-            className="text-xs font-medium text-gray-600 hover:text-blue-600 px-3 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
+            disabled={isDeleting}
+            className="text-xs font-medium text-gray-600 hover:text-blue-600 px-3 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
           >
             수정
           </button>
           <button
             type="button"
             onClick={handleDelete}
-            className="text-xs font-medium text-gray-600 hover:text-red-600 px-3 py-1.5 rounded-md border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer"
+            disabled={isDeleting}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md border transition-colors ${
+              isDeleting
+                ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed"
+                : "text-gray-600 hover:text-red-600 border-gray-200 hover:border-red-300 hover:bg-red-50 cursor-pointer"
+            }`}
           >
-            삭제
+            {isDeleting ? "삭제 중..." : "삭제"}
           </button>
         </div>
       </div>

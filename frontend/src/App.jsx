@@ -49,6 +49,11 @@ export default function App() {
     setBookmarks((prev) => prev.map((item) => (item.id === updatedBookmark.id ? updatedBookmark : item)));
   };
 
+  const handleBookmarkDeleted = (deletedId) => {
+    // 성공 시: 부모에게 삭제된 id를 알려서, 목록 배열에서 해당 항목만 제거
+    setBookmarks((prev) => prev.filter((item) => item.id !== deletedId));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-16 font-sans">
       {/* 상단 고정 영역 (URL 입력 + 저장) */}
@@ -60,7 +65,13 @@ export default function App() {
         <FilterBar />
 
         {/* 카드 목록 영역 (3열 그리드) */}
-        <BookmarkList bookmarks={bookmarks} loading={loading} error={error} onBookmarkUpdated={handleBookmarkUpdated} />
+        <BookmarkList
+          bookmarks={bookmarks}
+          loading={loading}
+          error={error}
+          onBookmarkUpdated={handleBookmarkUpdated}
+          onBookmarkDeleted={handleBookmarkDeleted}
+        />
       </main>
     </div>
   );

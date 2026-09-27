@@ -93,3 +93,20 @@ export async function updateBookmark(id, updateData) {
 
   return response.json();
 }
+
+/**
+ * 북마크 삭제 (DELETE /api/bookmarks/{id})
+ * @param {number|string} id - 북마크 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteBookmark(id) {
+  const response = await fetch(`${API_BASE_URL}/api/bookmarks/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const message = errorData?.message || `북마크 삭제에 실패했습니다. (HTTP ${response.status})`;
+    throw new Error(message);
+  }
+}

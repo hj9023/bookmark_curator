@@ -1,6 +1,12 @@
 import BookmarkCard from "./BookmarkCard";
 
-export default function BookmarkList({ bookmarks = [], loading = false, error = null, onBookmarkUpdated }) {
+export default function BookmarkList({
+  bookmarks = [],
+  loading = false,
+  error = null,
+  onBookmarkUpdated,
+  onBookmarkDeleted,
+}) {
   // 1. 로딩 중 표시
   if (loading) {
     return (
@@ -34,7 +40,12 @@ export default function BookmarkList({ bookmarks = [], loading = false, error = 
   return (
     <section className="grid grid-cols-3 gap-6">
       {bookmarks.map((bookmark) => (
-        <BookmarkCard key={bookmark.id} bookmark={bookmark} onBookmarkUpdated={onBookmarkUpdated} />
+        <BookmarkCard
+          key={bookmark.id}
+          bookmark={bookmark}
+          onBookmarkUpdated={onBookmarkUpdated}
+          onBookmarkDeleted={onBookmarkDeleted}
+        />
       ))}
     </section>
   );
