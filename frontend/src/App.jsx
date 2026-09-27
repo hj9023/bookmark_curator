@@ -9,6 +9,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 필터링 상태: contentType(기본값 "전체") 및 keyword(검색어)
+  const [contentType, setContentType] = useState("전체");
+  const [keyword, setKeyword] = useState("");
+
   useEffect(() => {
     let ignore = false;
 
@@ -54,6 +58,21 @@ export default function App() {
     setBookmarks((prev) => prev.filter((item) => item.id !== deletedId));
   };
 
+  // 클라이언트 사이드 실시간 필터링: contentType + keyword (title 또는 summary, 대소문자 무시)
+  const filteredBookmarks = bookmarks.filter((bookmark) => {
+    // 1. contentType 필터링: "전체"가 아니면 일치하는 것만
+    const matchesType = contentType === "전체" || bookmark.contentType === contentType;
+
+    // 2. keyword 필터링: title 또는 summary에 포함되는 것만 (대소문자 무시)
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const matchesKeyword =
+      !normalizedKeyword ||
+      (bookmark.title && bookmark.title.toLowerCase().includes(normalizedKeyword)) ||
+      (bookmark.summary && bookmark.summary.toLowerCase().includes(normalizedKeyword));
+
+    return matchesType && matchesKeyword;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-16 font-sans">
       {/* 상단 고정 영역 (URL 입력 + 저장) */}
@@ -62,11 +81,17 @@ export default function App() {
       {/* 본문 영역 (1200px 데스크탑 뷰 기준) */}
       <main className="w-[1200px] mx-auto">
         {/* 필터 영역 (타입 필터 + 검색) */}
-        <FilterBar />
+        <FilterBar
+          selectedType={contentType}
+          onSelectType={setContentType}
+          keyword={keyword}
+          onKeywordChange={setKeyword}
+        />
 
         {/* 카드 목록 영역 (3열 그리드) */}
         <BookmarkList
-          bookmarks={bookmarks}
+          bookmarks={filteredBookmarks}
+          totalCount={bookmarks.length}
           loading={loading}
           error={error}
           onBookmarkUpdated={handleBookmarkUpdated}

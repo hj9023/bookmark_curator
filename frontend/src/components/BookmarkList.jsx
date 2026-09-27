@@ -2,6 +2,7 @@ import BookmarkCard from "./BookmarkCard";
 
 export default function BookmarkList({
   bookmarks = [],
+  totalCount = 0,
   loading = false,
   error = null,
   onBookmarkUpdated,
@@ -27,11 +28,11 @@ export default function BookmarkList({
     );
   }
 
-  // 2. 목록이 비어있을 때 표시
+  // 2. 목록이 비어있을 때 표시 (전체 데이터 없음 vs 필터 결과 없음 구분)
   if (bookmarks.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-500 shadow-xs">
-        저장된 북마크가 없습니다
+        {totalCount > 0 ? "조건에 맞는 북마크가 없습니다" : "저장된 북마크가 없습니다"}
       </div>
     );
   }
