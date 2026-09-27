@@ -44,6 +44,11 @@ export default function App() {
     setBookmarks((prev) => [newBookmark, ...prev]);
   };
 
+  const handleBookmarkUpdated = (updatedBookmark) => {
+    // 성공 시: 전체 목록을 다시 불러오지 않고, 부모 배열 state에서 해당 id 항목만 교체
+    setBookmarks((prev) => prev.map((item) => (item.id === updatedBookmark.id ? updatedBookmark : item)));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-16 font-sans">
       {/* 상단 고정 영역 (URL 입력 + 저장) */}
@@ -55,7 +60,7 @@ export default function App() {
         <FilterBar />
 
         {/* 카드 목록 영역 (3열 그리드) */}
-        <BookmarkList bookmarks={bookmarks} loading={loading} error={error} />
+        <BookmarkList bookmarks={bookmarks} loading={loading} error={error} onBookmarkUpdated={handleBookmarkUpdated} />
       </main>
     </div>
   );

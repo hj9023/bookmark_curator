@@ -65,3 +65,31 @@ export async function createBookmark(bookmarkData) {
 
   return response.json();
 }
+
+/**
+ * 북마크 수정 (PATCH /api/bookmarks/{id})
+ * @param {number|string} id - 북마크 ID
+ * @param {Object} updateData
+ * @param {string} [updateData.title] - 제목
+ * @param {string} [updateData.memo] - 메모
+ * @param {string} [updateData.contentType] - ARTICLE, GITHUB, VIDEO, IMAGE, DOCUMENT, OTHER
+ * @param {string[]} [updateData.tags] - 태그 목록
+ * @returns {Promise<Object>} 수정된 BookmarkResponse
+ */
+export async function updateBookmark(id, updateData) {
+  const response = await fetch(`${API_BASE_URL}/api/bookmarks/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updateData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const message = errorData?.message || `북마크 수정에 실패했습니다. (HTTP ${response.status})`;
+    throw new Error(message);
+  }
+
+  return response.json();
+}
