@@ -60,6 +60,18 @@ class ContentFetchServiceTest {
         assertThat(invalidResult.content()).isEmpty();
     }
 
+    @Test
+    @DisplayName("한글 퍼센트 인코딩된 URL 경로에서 슬러그 제목을 정상적으로 디코딩하고 추출한다")
+    void testSlugExtraction() {
+        String msnUrl = "https://www.msn.com/ko-kr/news/other/10%EB%AA%85-%EC%88%A8%EC%A7%80%EA%B3%A0-92%EB%AA%85-%EB%8B%A4%EC%B3%A4%EB%8B%A4-%EB%B6%88%EC%95%88%ED%95%9C-%ED%9C%B4%EA%B2%8C%EC%86%8C-%EC%95%88%EC%A0%84-sbs-8%EB%89%B4%EC%8A%A4/vi-AA2d0JoP";
+        String slug = contentFetchService.extractSlugTitle(msnUrl);
+        assertThat(slug).isEqualTo("10명 숨지고 92명 다쳤다 불안한 휴게소 안전 sbs 8뉴스");
+
+        String velogUrl = "https://velog.io/@developer/%EC%8A%A4%ED%94%84%EB%A7%81-%EB%B6%80%ED%8A%B8-JPA-%EC%A0%95%EB%B3%B5";
+        String velogSlug = contentFetchService.extractSlugTitle(velogUrl);
+        assertThat(velogSlug).isEqualTo("스프링 부트 JPA 정복");
+    }
+
     private void printResult(String label, String url, ContentFetchResult result) {
         System.out.println("==================================================");
         System.out.println("[" + label + " 테스트]");

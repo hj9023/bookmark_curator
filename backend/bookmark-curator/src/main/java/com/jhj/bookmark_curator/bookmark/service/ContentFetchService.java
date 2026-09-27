@@ -8,6 +8,8 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 @Slf4j
@@ -78,14 +80,24 @@ public class ContentFetchService {
         if (lowerUrl.contains("/blog") || lowerUrl.contains("/news")
                 || lowerUrl.contains("/article") || lowerUrl.contains("/post")
                 || lowerUrl.contains("/posts") || lowerUrl.contains("/story")
-                || lowerUrl.contains("/entry")) {
+                || lowerUrl.contains("/entry") || lowerUrl.contains("/view/")
+                || lowerUrl.contains("/detail/") || lowerUrl.contains("/read/")
+                || lowerUrl.contains("/press/")) {
             return true;
         }
 
-        // 도메인 힌트 (대표 블로그/뉴스 플랫폼)
+        // 도메인 힌트 (대표 블로그/뉴스 플랫폼 및 주요 언론사)
         if (lowerUrl.contains("medium.com") || lowerUrl.contains("velog.io")
                 || lowerUrl.contains("tistory.com") || lowerUrl.contains("brunch.co.kr")
-                || lowerUrl.contains("substack.com") || lowerUrl.contains("news.")) {
+                || lowerUrl.contains("substack.com") || lowerUrl.contains("news.")
+                || lowerUrl.contains("yna.co.kr") || lowerUrl.contains("chosun.com")
+                || lowerUrl.contains("joongang.co.kr") || lowerUrl.contains("donga.com")
+                || lowerUrl.contains("hani.co.kr") || lowerUrl.contains("khan.co.kr")
+                || lowerUrl.contains("newsis.com") || lowerUrl.contains("news1.kr")
+                || lowerUrl.contains("ytn.co.kr") || lowerUrl.contains("sbs.co.kr")
+                || lowerUrl.contains("kbs.co.kr") || lowerUrl.contains("mbc.co.kr")
+                || lowerUrl.contains("hankyung.com") || lowerUrl.contains("mk.co.kr")
+                || lowerUrl.contains("zdnet.co.kr") || lowerUrl.contains("etnews.com")) {
             return true;
         }
 
@@ -156,9 +168,24 @@ public class ContentFetchService {
             Document doc = connect(url);
             String title = extractTitle(doc);
             String content = extractBodyText(doc);
+
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                if (title.isBlank() || isGenericTitle(title)) {
+                    title = slugTitle;
+                }
+                if (content.isBlank()) {
+                    content = "문서 제목: " + title;
+                }
+            }
+
             return new ContentFetchResult(ContentType.DOCUMENT, title, truncate(content, MAX_CONTENT_LENGTH));
         } catch (Exception e) {
             log.warn("Document 웹페이지 수집 실패: {}", e.getMessage());
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                return new ContentFetchResult(ContentType.DOCUMENT, slugTitle, "문서 제목: " + slugTitle);
+            }
             return ContentFetchResult.emptyOther();
         }
     }
@@ -168,9 +195,24 @@ public class ContentFetchService {
             Document doc = connect(url);
             String title = extractTitle(doc);
             String content = extractBodyText(doc);
+
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                if (title.isBlank() || isGenericTitle(title)) {
+                    title = slugTitle;
+                }
+                if (content.isBlank()) {
+                    content = "제목: " + title;
+                }
+            }
+
             return new ContentFetchResult(ContentType.ARTICLE, title, truncate(content, MAX_CONTENT_LENGTH));
         } catch (Exception e) {
             log.warn("Article 수집 실패: {}", e.getMessage());
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                return new ContentFetchResult(ContentType.ARTICLE, slugTitle, "제목: " + slugTitle);
+            }
             return ContentFetchResult.emptyOther();
         }
     }
@@ -180,14 +222,110 @@ public class ContentFetchService {
             Document doc = connect(url);
             String title = extractTitle(doc);
             String content = extractBodyText(doc);
-            return new ContentFetchResult(ContentType.OTHER, title, truncate(content, MAX_CONTENT_LENGTH));
+
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                if (title.isBlank() || isGenericTitle(title)) {
+                    title = slugTitle;
+                }
+                if (content.isBlank()) {
+                    content = "제목: " + title;
+                }
+            }
+
+            // HTML 메타태그(og:type 등)에서 article 여부 판별
+            ContentType resolvedType = isArticlePage(doc) ? ContentType.ARTICLE : ContentType.OTHER;
+
+            return new ContentFetchResult(resolvedType, title, truncate(content, MAX_CONTENT_LENGTH));
         } catch (Exception e) {
             log.warn("일반 웹페이지 수집 실패: {}", e.getMessage());
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank()) {
+                return new ContentFetchResult(ContentType.OTHER, slugTitle, "제목: " + slugTitle);
+            }
             return ContentFetchResult.emptyOther();
         }
     }
 
+    private boolean isArticlePage(Document doc) {
+        if (doc == null) {
+            return false;
+        }
+        String ogType = getMetaTag(doc, "og:type");
+        return ogType != null && ogType.toLowerCase().contains("article");
+    }
+
     // --- 공통 헬퍼 메서드 ---
+
+    public String extractSlugTitle(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        try {
+            String withoutProtocol = url.replaceFirst("^[a-zA-Z]+://", "");
+            int firstSlash = withoutProtocol.indexOf('/');
+            if (firstSlash < 0 || firstSlash == withoutProtocol.length() - 1) {
+                return "";
+            }
+
+            String pathOnly = withoutProtocol.substring(firstSlash + 1).split("[?#]")[0];
+            String[] segments = pathOnly.split("/");
+
+            String bestSlug = "";
+            for (String segment : segments) {
+                if (segment.isBlank()) continue;
+                String decoded;
+                try {
+                    decoded = URLDecoder.decode(segment, StandardCharsets.UTF_8);
+                } catch (Exception e) {
+                    decoded = segment;
+                }
+
+                int dotIdx = decoded.lastIndexOf('.');
+                if (dotIdx > 0 && dotIdx > decoded.length() - 6) {
+                    decoded = decoded.substring(0, dotIdx);
+                }
+
+                boolean hasKorean = containsKorean(decoded);
+                boolean isComposite = decoded.contains("-") || decoded.contains("_");
+
+                if ((hasKorean || isComposite) && decoded.length() > bestSlug.length()) {
+                    bestSlug = decoded;
+                }
+            }
+
+            if (!bestSlug.isBlank()) {
+                return bestSlug.replace("-", " ")
+                        .replace("_", " ")
+                        .replaceAll("\\s+", " ")
+                        .trim();
+            }
+        } catch (Exception e) {
+            log.warn("URL 슬러그 추출 실패 (url: {}): {}", url, e.getMessage());
+        }
+        return "";
+    }
+
+    private boolean containsKorean(String text) {
+        if (text == null) return false;
+        for (char c : text.toCharArray()) {
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+            if (block == Character.UnicodeBlock.HANGUL_SYLLABLES
+                    || block == Character.UnicodeBlock.HANGUL_JAMO
+                    || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isGenericTitle(String title) {
+        if (title == null || title.isBlank()) return true;
+        String lower = title.trim().toLowerCase();
+        return lower.equals("msn") || lower.startsWith("msn ") || lower.startsWith("msn -")
+                || lower.equals("home") || lower.equals("naver") || lower.equals("daum")
+                || lower.equals("untitled") || lower.equals("홈") || lower.equals("메인");
+    }
 
     private Document connect(String url) throws Exception {
         return Jsoup.connect(url)
@@ -226,8 +364,13 @@ public class ContentFetchService {
 
     private String extractFileName(String url) {
         try {
-            String path = URI.create(url).getPath();
-            return Paths.get(path).getFileName().toString();
+            String cleanUrl = url.split("[?#]")[0];
+            int lastSlash = cleanUrl.lastIndexOf('/');
+            if (lastSlash >= 0 && lastSlash < cleanUrl.length() - 1) {
+                String fileName = cleanUrl.substring(lastSlash + 1);
+                return URLDecoder.decode(fileName, StandardCharsets.UTF_8);
+            }
+            return "";
         } catch (Exception e) {
             return "";
         }
