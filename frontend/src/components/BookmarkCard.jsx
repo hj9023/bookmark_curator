@@ -1,0 +1,113 @@
+import { useState } from "react";
+
+const TYPE_BADGE_STYLES = {
+  ARTICLE: "bg-blue-50 text-blue-700 border-blue-200",
+  GITHUB: "bg-zinc-100 text-zinc-800 border-zinc-300",
+  VIDEO: "bg-red-50 text-red-700 border-red-200",
+  IMAGE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  DOCUMENT: "bg-amber-50 text-amber-800 border-amber-200",
+  OTHER: "bg-purple-50 text-purple-700 border-purple-200",
+};
+
+export default function BookmarkCard({ bookmark }) {
+  const { id, url, title, memo, summary, contentType, tags = [] } = bookmark;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    console.log("수정 클릭:", id);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    console.log("삭제 클릭:", id);
+  };
+
+  const toggleExpand = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
+  const badgeStyle = TYPE_BADGE_STYLES[contentType] || "bg-gray-100 text-gray-700 border-gray-200";
+
+  return (
+    <article
+      onClick={toggleExpand}
+      className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-gray-300 transition-all cursor-pointer select-none"
+    >
+      <div>
+        {/* 상단: 타입 뱃지 및 펼침 힌트 */}
+        <div className="flex items-center justify-between mb-3">
+          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeStyle}`}>{contentType}</span>
+          <span className="text-xs text-gray-400 hover:text-blue-600 transition-colors">
+            {isExpanded ? "접기 ▲" : "전체보기 ▼"}
+          </span>
+        </div>
+
+        {/* 제목 */}
+        <h3 className="text-base font-bold text-gray-900 mb-2 line-clamp-1">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            {title}
+          </a>
+        </h3>
+
+        {/* 요약 (클릭 시 3줄 제한 <-> 전체 펼침 토글) */}
+        <div className="mb-4">
+          <p
+            className={`text-sm text-gray-600 leading-relaxed transition-all ${
+              isExpanded ? "whitespace-pre-line" : "line-clamp-3"
+            }`}
+          >
+            {summary}
+          </p>
+
+          {/* 펼쳐졌을 때 메모가 있으면 함께 표시 */}
+          {isExpanded && memo && (
+            <div className="mt-3 p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg text-xs text-amber-900 leading-relaxed">
+              <span className="font-semibold block mb-1">📝 메모:</span>
+              {memo}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        {/* 태그 목록 */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {tags.map((tag, idx) => (
+            <span
+              key={`${id}-tag-${idx}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+
+        {/* 하단 액션 버튼 */}
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={handleEdit}
+            className="text-xs font-medium text-gray-600 hover:text-blue-600 px-3 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
+          >
+            수정
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="text-xs font-medium text-gray-600 hover:text-red-600 px-3 py-1.5 rounded-md border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}

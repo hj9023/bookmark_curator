@@ -1,0 +1,39 @@
+import { useState } from "react";
+
+export default function BookmarkForm() {
+  const [url, setUrl] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("저장 클릭 (URL):", url);
+  };
+
+  return (
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs mb-8">
+      <div className="w-[1200px] mx-auto py-4">
+        {/* 서비스 타이틀 */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">🔖</span>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">북마크 큐레이션</h1>
+        </div>
+
+        {/* URL 입력창 + 저장 버튼 */}
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="저장할 URL을 입력하세요 (예: https://...)"
+            className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+          />
+          <button
+            type="submit"
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg shadow-xs hover:shadow-sm transition-all cursor-pointer"
+          >
+            저장
+          </button>
+        </form>
+      </div>
+    </header>
+  );
+}
