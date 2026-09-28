@@ -44,6 +44,20 @@ public class SummaryService {
             }
             """;
 
+    private static final String VISION_PROMPT = """
+            당신은 웹 이미지를 분석하고 핵심 내용을 요약하는 AI 어시스턴트입니다.
+            제공된 이미지를 시각적으로 분석하여 핵심 내용을 한국어로 2~3줄(문장)로 요약하고, 관련 핵심 키워드(태그) 3~5개를 추출해주세요.
+
+            [요구사항]
+            1. summary는 이미지의 핵심 피사체, 맥락, 특징을 한국어로 2~3줄(문장)로 요약하세요.
+            2. tags는 이미지를 대표하는 키워드 3~5개를 한국어 또는 널리 쓰이는 영문 기술용어로 추출하세요.
+            3. 반드시 아래의 JSON 형식으로만 응답해야 합니다. 마크다운 코드블록(```json 등)이나 기타 설명 문장 없이 순수 JSON 객체만 반환하세요:
+            {
+              "summary": "2~3줄 요약 내용",
+              "tags": ["태그1", "태그2", "태그3"]
+            }
+            """;
+
     @Value("${groq.api-key}")
     private String apiKey;
 
@@ -52,6 +66,9 @@ public class SummaryService {
 
     @Value("${groq.model:openai/gpt-oss-120b}")
     private String model;
+
+    @Value("${groq.vision-model:llama-3.2-11b-vision-preview}")
+    private String visionModel;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -75,6 +92,24 @@ public class SummaryService {
     }
 
     public SummaryResult summarize(ContentType contentType, String content) {
+        return summarize(contentType, content, null);
+    }
+
+    public SummaryResult summarize(ContentType contentType, String content, String url) {
+        // 1. IMAGE 비전 분기 (빈 텍스트 폴백보다 먼저 실행)
+        if (contentType == ContentType.IMAGE && url != null && !url.isBlank()) {
+            try {
+                return summarizeImageWithVision(url);
+            } catch (HttpStatusCodeException e) {
+                log.warn("비전 모델 요약 실패 - HTTP 상태코드: {}, 오류 메시지: {}", e.getStatusCode(), e.getResponseBodyAsString());
+                return createFallbackResult(ContentType.IMAGE);
+            } catch (Exception e) {
+                log.warn("비전 모델 요약 실패 - 오류 메시지: {}", e.getMessage());
+                return createFallbackResult(ContentType.IMAGE);
+            }
+        }
+
+        // 2. 텍스트가 비어있으면 Groq API 호출 없이 고정 폴백 반환
         if (content == null || content.isBlank()) {
             return createFallbackResult(contentType);
         }
@@ -156,6 +191,39 @@ public class SummaryService {
         SummaryJsonDto dto = objectMapper.readValue(rawJson, SummaryJsonDto.class);
         List<String> tags = dto.tags() != null ? dto.tags() : Collections.emptyList();
         return new SummaryResult(dto.summary(), tags);
+    }
+
+    private SummaryResult summarizeImageWithVision(String url) throws Exception {
+        Map<String, Object> textPart = Map.of(
+                "type", "text",
+                "text", VISION_PROMPT
+        );
+        Map<String, Object> imagePart = Map.of(
+                "type", "image_url",
+                "image_url", Map.of("url", url)
+        );
+        Map<String, Object> message = Map.of(
+                "role", "user",
+                "content", List.of(textPart, imagePart)
+        );
+
+        Map<String, Object> requestBody = Map.of(
+                "model", (visionModel != null && !visionModel.isBlank() )? visionModel : "qwen/qwen3.8-27b",
+                "messages", List.of(message),
+                "response_format", Map.of("type", "json_object"),
+                "temperature", 0.3,
+                "max_tokens", 300
+        );
+
+        String responseBody = restClient.post()
+                .uri(apiUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .retrieve()
+                .body(String.class);
+
+        return parseSummaryResult(responseBody);
     }
 
     private SummaryResult createFallbackResult(ContentType contentType) {

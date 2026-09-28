@@ -41,6 +41,7 @@ class SummaryServiceExceptionTest {
         ReflectionTestUtils.setField(summaryService, "apiUrl", apiUrl);
         ReflectionTestUtils.setField(summaryService, "apiKey", "test-api-key");
         ReflectionTestUtils.setField(summaryService, "model", "test-model");
+        ReflectionTestUtils.setField(summaryService, "visionModel", "llama-3.2-11b-vision-preview");
     }
 
     @Test
@@ -157,6 +158,49 @@ class SummaryServiceExceptionTest {
         assertThat(otherResult.tags()).containsExactly("기타");
 
         // Groq API가 한 번도 호출되지 않았음을 검증
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("IMAGE 타입 및 URL 제공 시 비전 모델을 호출하여 요약과 태그를 정상 생성한다")
+    void summarizeImageWithVisionSuccess() {
+        String imageUrl = "https://example.com/sample.png";
+        String mockVisionResponse = """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\\"summary\\": \\"샘플 이미지 요약입니다.\\", \\"tags\\": [\\"샘플\\", \\"이미지\\"]}"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        mockServer.expect(requestTo(apiUrl))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(mockVisionResponse, MediaType.APPLICATION_JSON));
+
+        SummaryResult result = summaryService.summarize(ContentType.IMAGE, "", imageUrl);
+
+        assertThat(result.summary()).isEqualTo("샘플 이미지 요약입니다.");
+        assertThat(result.tags()).containsExactly("샘플", "이미지");
+        mockServer.verify();
+    }
+
+    @Test
+    @DisplayName("비전 모델 호출 시 HTTP 에러(403 등)가 발생하면 예외를 던지지 않고 고정 폴백으로 복구된다")
+    void fallbackWhenVisionModelFailsWithHttpError() {
+        String imageUrl = "https://example.com/blocked.png";
+
+        mockServer.expect(requestTo(apiUrl))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).body("403 Forbidden - Hotlinking blocked"));
+
+        SummaryResult result = summaryService.summarize(ContentType.IMAGE, "", imageUrl);
+
+        assertThat(result.summary()).isEqualTo("이미지 파일입니다. 메모를 직접 입력해주세요");
+        assertThat(result.tags()).containsExactly("이미지");
         mockServer.verify();
     }
 }

@@ -233,7 +233,7 @@ public class ContentFetchService {
             }
 
             // HTML 메타태그(og:type 등)에서 article 여부 판별
-            ContentType resolvedType = isArticlePage(doc) ? ContentType.ARTICLE : ContentType.OTHER;
+            ContentType resolvedType = isArticlePage(doc, url) ? ContentType.ARTICLE : ContentType.OTHER;
 
             return new ContentFetchResult(resolvedType, title, truncate(content, MAX_CONTENT_LENGTH));
         } catch (Exception e) {
@@ -246,9 +246,15 @@ public class ContentFetchService {
         }
     }
 
-    private boolean isArticlePage(Document doc) {
+    private boolean isArticlePage(Document doc, String url) {
         if (doc == null) {
             return false;
+        }
+        if (url != null) {
+            String lower = url.toLowerCase();
+            if (lower.contains("/projects/") || lower.contains("/products/")) {
+                return false;
+            }
         }
         String ogType = getMetaTag(doc, "og:type");
         return ogType != null && ogType.toLowerCase().contains("article");

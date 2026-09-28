@@ -37,7 +37,7 @@ public class BookmarkService {
         ContentFetchResult fetched = contentFetchService.fetch(url);
 
         // 2. SummaryService로 요약/태그 생성
-        SummaryResult summarized = summaryService.summarize(fetched.contentType(), fetched.content());
+        SummaryResult summarized = summaryService.summarize(fetched.contentType(), fetched.content(), url);
 
         // 3. title 결정: 사용자 입력 우선, 없으면 fetch된 제목, 둘 다 없으면 URL
         String finalTitle = resolveTitle(title, fetched.title(), url);

@@ -62,7 +62,7 @@ class BookmarkServiceTest {
                 "LLM이 생성한 3줄 요약 내용입니다.",
                 List.of("AI", "Spring")
         );
-        given(summaryService.summarize(ContentType.ARTICLE, "수집된 본문 텍스트 내용..."))
+        given(summaryService.summarize(ContentType.ARTICLE, "수집된 본문 텍스트 내용...", url))
                 .willReturn(summaryResult);
 
         // Mock 3. TagRepository: 'ai'는 기존 태그 존재, 'spring'은 신규 저장
@@ -93,7 +93,7 @@ class BookmarkServiceTest {
                 .containsExactlyInAnyOrder("ai", "spring");
 
         verify(contentFetchService).fetch(url);
-        verify(summaryService).summarize(ContentType.ARTICLE, "수집된 본문 텍스트 내용...");
+        verify(summaryService).summarize(ContentType.ARTICLE, "수집된 본문 텍스트 내용...", url);
         verify(bookmarkRepository).save(any(Bookmark.class));
     }
 
@@ -197,5 +197,72 @@ class BookmarkServiceTest {
 
         assertThatThrownBy(() -> bookmarkService.delete(999L))
                 .isInstanceOf(BookmarkNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("create: 이미지 URL 생성 시 파일명 title 및 요약/태그가 정상 저장된다")
+    void createBookmarkWithImageUrlTest() {
+        // given
+        String imageUrl = "https://example.com/a.png";
+        ContentFetchResult fetchResult = new ContentFetchResult(
+                ContentType.IMAGE,
+                "a.png",
+                ""
+        );
+        given(contentFetchService.fetch(imageUrl)).willReturn(fetchResult);
+
+        SummaryResult summaryResult = new SummaryResult(
+                "이미지 파일입니다. 메모를 직접 입력해주세요",
+                List.of("이미지")
+        );
+        given(summaryService.summarize(ContentType.IMAGE, "", imageUrl)).willReturn(summaryResult);
+
+        Tag imageTag = new Tag("이미지");
+        given(tagRepository.findByName("이미지")).willReturn(Optional.of(imageTag));
+        given(bookmarkRepository.save(any(Bookmark.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when (사용자 title 미입력)
+        Bookmark created = bookmarkService.create(imageUrl, null, null);
+
+        // then
+        assertThat(created).isNotNull();
+        assertThat(created.getUrl()).isEqualTo(imageUrl);
+        assertThat(created.getTitle()).isEqualTo("a.png");
+        assertThat(created.getSummary()).isEqualTo("이미지 파일입니다. 메모를 직접 입력해주세요");
+        assertThat(created.getContentType()).isEqualTo(ContentType.IMAGE);
+        assertThat(created.getTags())
+                .extracting(Tag::getName)
+                .containsExactly("이미지");
+
+        verify(contentFetchService).fetch(imageUrl);
+        verify(summaryService).summarize(ContentType.IMAGE, "", imageUrl);
+        verify(bookmarkRepository).save(any(Bookmark.class));
+    }
+
+    @Test
+    @DisplayName("create: 파일명도 추출되지 않는 이미지 URL의 경우 원본 URL이 title로 폴백 저장된다")
+    void createBookmarkWithImageUrlFallbackToUrlTitleTest() {
+        // given (파일명이 빈 문자열인 경우)
+        String imageUrl = "https://example.com/";
+        ContentFetchResult fetchResult = new ContentFetchResult(
+                ContentType.IMAGE,
+                "",
+                ""
+        );
+        given(contentFetchService.fetch(imageUrl)).willReturn(fetchResult);
+
+        SummaryResult summaryResult = new SummaryResult(
+                "이미지 파일입니다. 메모를 직접 입력해주세요",
+                List.of("이미지")
+        );
+        given(summaryService.summarize(ContentType.IMAGE, "", imageUrl)).willReturn(summaryResult);
+        given(tagRepository.findByName("이미지")).willReturn(Optional.of(new Tag("이미지")));
+        given(bookmarkRepository.save(any(Bookmark.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        Bookmark created = bookmarkService.create(imageUrl, null, null);
+
+        // then: title이 URL 자체로 폴백됨
+        assertThat(created.getTitle()).isEqualTo(imageUrl);
     }
 }
