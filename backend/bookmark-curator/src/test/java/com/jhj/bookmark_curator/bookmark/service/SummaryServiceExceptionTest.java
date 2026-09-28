@@ -137,5 +137,27 @@ class SummaryServiceExceptionTest {
 
         mockServer.verify();
     }
+
+    @Test
+    @DisplayName("content가 비어있거나 공백일 때 Groq API를 호출하지 않고 고정된 폴백 결과를 반환한다 (IMAGE, DOCUMENT, OTHER)")
+    void returnFallbackWithoutCallingGroqWhenContentIsBlank() {
+        // IMAGE
+        SummaryResult imageResult = summaryService.summarize(ContentType.IMAGE, "");
+        assertThat(imageResult.summary()).isEqualTo("이미지 파일입니다. 메모를 직접 입력해주세요");
+        assertThat(imageResult.tags()).containsExactly("이미지");
+
+        // DOCUMENT
+        SummaryResult docResult = summaryService.summarize(ContentType.DOCUMENT, "   ");
+        assertThat(docResult.summary()).isEqualTo("요약할 수 있는 텍스트를 가져오지 못했습니다. 메모를 직접 입력해주세요");
+        assertThat(docResult.tags()).containsExactly("문서");
+
+        // OTHER (or null content)
+        SummaryResult otherResult = summaryService.summarize(ContentType.OTHER, null);
+        assertThat(otherResult.summary()).isEqualTo("요약할 수 있는 텍스트를 가져오지 못했습니다. 메모를 직접 입력해주세요");
+        assertThat(otherResult.tags()).containsExactly("기타");
+
+        // Groq API가 한 번도 호출되지 않았음을 검증
+        mockServer.verify();
+    }
 }
 

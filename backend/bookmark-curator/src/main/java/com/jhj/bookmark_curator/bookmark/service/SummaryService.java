@@ -76,7 +76,7 @@ public class SummaryService {
 
     public SummaryResult summarize(ContentType contentType, String content) {
         if (content == null || content.isBlank()) {
-            return new SummaryResult("요약할 콘텐츠가 없습니다. 메모를 직접 입력해주세요.", List.of("미분류"));
+            return createFallbackResult(contentType);
         }
 
         try {
@@ -156,6 +156,16 @@ public class SummaryService {
         SummaryJsonDto dto = objectMapper.readValue(rawJson, SummaryJsonDto.class);
         List<String> tags = dto.tags() != null ? dto.tags() : Collections.emptyList();
         return new SummaryResult(dto.summary(), tags);
+    }
+
+    private SummaryResult createFallbackResult(ContentType contentType) {
+        if (contentType == ContentType.IMAGE) {
+            return new SummaryResult("이미지 파일입니다. 메모를 직접 입력해주세요", List.of("이미지"));
+        }
+        if (contentType == ContentType.DOCUMENT) {
+            return new SummaryResult("요약할 수 있는 텍스트를 가져오지 못했습니다. 메모를 직접 입력해주세요", List.of("문서"));
+        }
+        return new SummaryResult("요약할 수 있는 텍스트를 가져오지 못했습니다. 메모를 직접 입력해주세요", List.of("기타"));
     }
 
     private String cleanJsonString(String raw) {

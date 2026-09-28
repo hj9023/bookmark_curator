@@ -147,9 +147,8 @@ public class ContentFetchService {
 
     private ContentFetchResult fetchImage(String url) {
         String fileName = extractFileName(url);
-        String title = fileName.isBlank() ? "Image" : fileName;
-        String content = "파일명: " + title;
-        return new ContentFetchResult(ContentType.IMAGE, title, content);
+        String title = fileName.isBlank() ? "" : fileName;
+        return new ContentFetchResult(ContentType.IMAGE, title, "");
     }
 
     private ContentFetchResult fetchDocument(String url, String lowerUrl) {
@@ -159,8 +158,8 @@ public class ContentFetchService {
 
         if (isDocFile) {
             String fileName = extractFileName(url);
-            String title = fileName.isBlank() ? "Document" : fileName;
-            return new ContentFetchResult(ContentType.DOCUMENT, title, "문서 파일: " + title);
+            String title = fileName.isBlank() ? "" : fileName;
+            return new ContentFetchResult(ContentType.DOCUMENT, title, "");
         }
 
         // 웹 기반 문서 (/docs/, /wiki/ 등)

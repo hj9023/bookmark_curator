@@ -72,6 +72,16 @@ class ContentFetchServiceTest {
         assertThat(velogSlug).isEqualTo("스프링 부트 JPA 정복");
     }
 
+    @Test
+    @DisplayName("이미지 URL의 경우 확장자를 기반으로 IMAGE로 판별하고 파일명을 title로, 빈 문자열을 content로 반환한다")
+    void testImageFetch() {
+        String imageUrl = "https://example.com/assets/logo.png";
+        ContentFetchResult result = contentFetchService.fetch(imageUrl);
+        assertThat(result.contentType()).isEqualTo(ContentType.IMAGE);
+        assertThat(result.title()).isEqualTo("logo.png");
+        assertThat(result.content()).isEmpty();
+    }
+
     private void printResult(String label, String url, ContentFetchResult result) {
         System.out.println("==================================================");
         System.out.println("[" + label + " 테스트]");
