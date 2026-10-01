@@ -29,6 +29,20 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  // 요약 클립보드 복사
+  const handleCopySummary = async (e) => {
+    e.stopPropagation();
+    if (!summary) return;
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("클립보드 복사 실패:", err);
+    }
+  };
 
   // 수정 모드 진입
   const handleStartEdit = (e) => {
@@ -126,6 +140,10 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
   };
 
   const toggleExpand = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return;
+    }
     if (!isEditing) {
       setIsExpanded((prev) => !prev);
     }
@@ -207,10 +225,26 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
 
           {/* 요약 (수정 불가 - 텍스트 표시) */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">
-              AI 요약 <span className="text-gray-400 font-normal">(수정 불가)</span>
-            </label>
-            <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-200 line-clamp-3 leading-relaxed">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-gray-500">
+                AI 요약 <span className="text-gray-400 font-normal">(수정 불가)</span>
+              </label>
+              {summary && (
+                <button
+                  type="button"
+                  onClick={handleCopySummary}
+                  className="text-xs inline-flex items-center gap-1 text-gray-400 hover:text-blue-600 px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors cursor-pointer select-none"
+                  title="요약 내용 복사"
+                >
+                  {copied ? (
+                    <span className="text-emerald-600 text-[11px] font-medium">✓ 복사됨</span>
+                  ) : (
+                    <span className="text-[11px]">복사</span>
+                  )}
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-200 line-clamp-3 leading-relaxed select-text">
               {summary}
             </p>
           </div>
@@ -279,7 +313,7 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
   return (
     <article
       onClick={toggleExpand}
-      className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-gray-300 transition-all cursor-pointer select-none"
+      className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
     >
       <div>
         {/* 삭제 에러 등 인라인 에러 배너 (보기 모드) */}
@@ -329,8 +363,33 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
 
         {/* 요약 (클릭 시 3줄 제한 <-> 전체 펼침 토글) */}
         <div className="mb-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-gray-400">AI 요약</span>
+            {summary && (
+              <button
+                type="button"
+                onClick={handleCopySummary}
+                className="text-xs inline-flex items-center gap-1 text-gray-400 hover:text-blue-600 px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors cursor-pointer select-none"
+                title="요약 내용 복사"
+              >
+                {copied ? (
+                  <>
+                    <span className="text-emerald-600 font-bold">✓</span>
+                    <span className="text-emerald-600 text-[11px] font-medium">복사됨</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[11px]">복사</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
           <p
-            className={`text-sm text-gray-600 leading-relaxed transition-all ${
+            className={`text-sm text-gray-600 leading-relaxed transition-all select-text cursor-text ${
               isExpanded ? "whitespace-pre-line" : "line-clamp-3"
             }`}
           >
@@ -339,7 +398,7 @@ export default function BookmarkCard({ bookmark, onBookmarkUpdated, onBookmarkDe
 
           {/* 펼쳐졌을 때 메모가 있으면 함께 표시 */}
           {isExpanded && memo && (
-            <div className="mt-3 p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg text-xs text-amber-900 leading-relaxed">
+            <div className="mt-3 p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg text-xs text-amber-900 leading-relaxed select-text">
               <span className="font-semibold block mb-1">📝 메모:</span>
               {memo}
             </div>
