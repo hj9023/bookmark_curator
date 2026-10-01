@@ -1,1 +1,4 @@
 "target/\n.idea/\n.env\napplication-local.yml" 
+
+**/.env
+**/.env.local

@@ -3,7 +3,7 @@ spring:
     name: bookmark-curator
 
   datasource:
-    url: jdbc:h2:mem:bookmarkdb
+    url: jdbc:h2:file:./data/bookmarkdb
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -30,3 +30,7 @@ groq:
   url: https://api.groq.com/openai/v1/chat/completions
   model: openai/gpt-oss-20b
   vision-model: qwen/qwen3.8-27b
+
+cors:
+  # 환경변수 CORS_ALLOWED_ORIGINS가 없으면 기본값(로컬 주소들) 사용
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
