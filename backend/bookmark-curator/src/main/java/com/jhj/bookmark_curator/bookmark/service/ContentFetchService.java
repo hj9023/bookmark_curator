@@ -1,16 +1,19 @@
 package com.jhj.bookmark_curator.bookmark.service;
 
-import com.jhj.bookmark_curator.bookmark.domain.ContentType;
-import lombok.extern.slf4j.Slf4j;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import com.jhj.bookmark_curator.bookmark.domain.ContentType;
+
+import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Service
@@ -20,6 +23,16 @@ public class ContentFetchService {
     private static final int TIMEOUT_MILLIS = 5000;
     private static final int MAX_CONTENT_LENGTH = 5000;
 
+    private final ObjectMapper objectMapper;
+
+    public ContentFetchService() {
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public ContentFetchService(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
     public ContentFetchResult fetch(String url) {
         if (url == null || url.isBlank()) {
             return ContentFetchResult.emptyOther();
@@ -28,7 +41,7 @@ public class ContentFetchService {
         try {
             String lowerUrl = url.toLowerCase().trim();
 
-            if (isYoutubeUrl(lowerUrl)) {
+            if (isVideoUrl(lowerUrl)) {
                 return fetchVideo(url);
             } else if (isGithubUrl(lowerUrl)) {
                 return fetchGithub(url);
@@ -49,8 +62,23 @@ public class ContentFetchService {
 
     // --- 타입 판별 메서드 ---
 
-    private boolean isYoutubeUrl(String lowerUrl) {
-        return lowerUrl.contains("youtube.com") || lowerUrl.contains("youtu.be") || lowerUrl.contains("vimeo.com");
+    private boolean isVideoUrl(String lowerUrl) {
+        if (isVideoFile(lowerUrl)) {
+            return true;
+        }
+        return lowerUrl.contains("youtube.com") || lowerUrl.contains("youtu.be")
+                || lowerUrl.contains("vimeo.com") || lowerUrl.contains("dailymotion.com")
+                || lowerUrl.contains("tiktok.com") || lowerUrl.contains("twitch.tv")
+                || lowerUrl.contains("chzzk.naver.com") || lowerUrl.contains("tv.naver.com")
+                || lowerUrl.contains("sooplive.co.kr") || lowerUrl.contains("afreecatv.com")
+                || lowerUrl.contains("ted.com/talks");
+    }
+
+    private boolean isVideoFile(String lowerUrl) {
+        String path = lowerUrl.split("\\?")[0];
+        return path.endsWith(".mp4") || path.endsWith(".webm") || path.endsWith(".avi")
+                || path.endsWith(".mov") || path.endsWith(".mkv") || path.endsWith(".flv")
+                || path.endsWith(".wmv");
     }
 
     private boolean isGithubUrl(String lowerUrl) {
@@ -108,20 +136,170 @@ public class ContentFetchService {
     // --- 콘텐츠 수집 메서드 ---
 
     private ContentFetchResult fetchVideo(String url) {
+        String lowerUrl = url.toLowerCase().trim();
+
+        // 1. 직접 동영상 파일 (.mp4, .webm 등)
+        if (isVideoFile(lowerUrl)) {
+            String fileName = extractFileName(url);
+            String title = fileName.isBlank() ? "동영상 파일" : fileName;
+            return new ContentFetchResult(ContentType.VIDEO, title, "동영상 파일: " + title);
+        }
+
+        // 2. oEmbed 지원 플랫폼 (YouTube, Vimeo)
+        if (lowerUrl.contains("youtube.com") || lowerUrl.contains("youtu.be")) {
+            return fetchYoutube(url);
+        } else if (lowerUrl.contains("vimeo.com")) {
+            return fetchVimeo(url);
+        }
+
+        // 3. 기타 일반 동영상 웹페이지 (TikTok, Dailymotion, 치지직, 네이버TV, TED 등)
+        return fetchGenericVideo(url);
+    }
+
+    private ContentFetchResult fetchYoutube(String url) {
+        try {
+            // shorts URL을 oEmbed가 지원하는 watch URL 형태로 변환
+            String targetUrl = url;
+            if (targetUrl.contains("/shorts/")) {
+                String id = targetUrl.split("/shorts/")[1].split("[?&#]")[0];
+                targetUrl = "https://www.youtube.com/watch?v=" + id;
+            }
+
+            String oembedUrl = "https://www.youtube.com/oembed?url="
+                    + URLEncoder.encode(targetUrl, StandardCharsets.UTF_8)
+                    + "&format=json";
+
+            String json = Jsoup.connect(oembedUrl)
+                    .ignoreContentType(true)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MILLIS)
+                    .execute()
+                    .body();
+
+            JsonNode node = objectMapper.readTree(json);
+            String title = node.path("title").asText("").trim();
+            String authorName = node.path("author_name").asText("").trim();
+
+            if (title.endsWith(" - YouTube")) {
+                title = title.substring(0, title.length() - " - YouTube".length()).trim();
+            }
+
+            // 추가 설명 수집 시도 (YouTube 기본 플랫폼 보일러플레이트 제외)
+            String description = "";
+            try {
+                Document doc = connect(url);
+                String ogDesc = getMetaTag(doc, "og:description");
+                if (ogDesc.isBlank()) {
+                    ogDesc = getMetaTag(doc, "description");
+                }
+                if (!ogDesc.isBlank() && !isGenericYoutubeDescription(ogDesc)) {
+                    description = ogDesc;
+                }
+            } catch (Exception e) {
+                log.debug("YouTube 본문 추가 메타데이터 수집 생략: {}", e.getMessage());
+            }
+
+            StringBuilder contentBuilder = new StringBuilder();
+            contentBuilder.append("유튜브 영상 제목: ").append(title);
+            if (!authorName.isBlank()) {
+                contentBuilder.append("\n채널/게시자: ").append(authorName);
+            }
+            if (!description.isBlank()) {
+                contentBuilder.append("\n영상 설명: ").append(description);
+            }
+
+            return new ContentFetchResult(ContentType.VIDEO, title, contentBuilder.toString().trim());
+        } catch (Exception e) {
+            log.warn("YouTube oEmbed 수집 실패, 일반 크롤링으로 대체 (url: {}): {}", url, e.getMessage());
+            return fetchGenericVideo(url);
+        }
+    }
+
+    private ContentFetchResult fetchVimeo(String url) {
+        try {
+            String oembedUrl = "https://vimeo.com/api/oembed.json?url="
+                    + URLEncoder.encode(url, StandardCharsets.UTF_8);
+
+            String json = Jsoup.connect(oembedUrl)
+                    .ignoreContentType(true)
+                    .userAgent(USER_AGENT)
+                    .timeout(TIMEOUT_MILLIS)
+                    .execute()
+                    .body();
+
+            JsonNode node = objectMapper.readTree(json);
+            String title = node.path("title").asText("").trim();
+            String author = node.path("author_name").asText("").trim();
+            String description = node.path("description").asText("").trim();
+
+            StringBuilder contentBuilder = new StringBuilder();
+            contentBuilder.append("동영상 제목: ").append(title);
+            if (!author.isBlank()) {
+                contentBuilder.append("\n게시자: ").append(author);
+            }
+            if (!description.isBlank()) {
+                contentBuilder.append("\n설명: ").append(description);
+            }
+
+            return new ContentFetchResult(ContentType.VIDEO, title, contentBuilder.toString().trim());
+        } catch (Exception e) {
+            log.warn("Vimeo oEmbed 수집 실패: {}", e.getMessage());
+            return fetchGenericVideo(url);
+        }
+    }
+
+    private ContentFetchResult fetchGenericVideo(String url) {
         try {
             Document doc = connect(url);
             String title = extractTitle(doc);
+            if (isGenericTitle(title)) {
+                title = "";
+            }
+
             String description = getMetaTag(doc, "og:description");
             if (description.isBlank()) {
                 description = getMetaTag(doc, "description");
             }
+            if (isGenericYoutubeDescription(description)) {
+                description = "";
+            }
 
-            String content = ("제목: " + title + "\n설명: " + description).trim();
-            return new ContentFetchResult(ContentType.VIDEO, title, content);
+            // 본문 텍스트도 추출 (일반 영상 페이지의 상세 소개문, 자막 등)
+            String bodyText = extractBodyText(doc);
+
+            String slugTitle = extractSlugTitle(url);
+            if (!slugTitle.isBlank() && title.isBlank()) {
+                title = slugTitle;
+            }
+
+            StringBuilder contentBuilder = new StringBuilder();
+            if (!title.isBlank()) {
+                contentBuilder.append("동영상 제목: ").append(title);
+            }
+            if (!description.isBlank()) {
+                if (!contentBuilder.isEmpty()) contentBuilder.append("\n설명: ");
+                contentBuilder.append(description);
+            }
+            if (!bodyText.isBlank() && description.isBlank()) {
+                if (!contentBuilder.isEmpty()) contentBuilder.append("\n내용: ");
+                contentBuilder.append(bodyText);
+            }
+
+            return new ContentFetchResult(ContentType.VIDEO, title, truncate(contentBuilder.toString().trim(), MAX_CONTENT_LENGTH));
         } catch (Exception e) {
-            log.warn("Video 정보 수집 실패: {}", e.getMessage());
-            return ContentFetchResult.emptyOther();
+            log.warn("Video 정보 수집 실패 (url: {}): {}", url, e.getMessage());
+            String slugTitle = extractSlugTitle(url);
+            return new ContentFetchResult(ContentType.VIDEO, slugTitle, slugTitle.isBlank() ? "" : "동영상: " + slugTitle);
         }
+    }
+
+    private boolean isGenericYoutubeDescription(String desc) {
+        if (desc == null || desc.isBlank()) return true;
+        String lower = desc.toLowerCase().trim();
+        return lower.contains("마음에 드는 동영상과 음악을 감상하고")
+                || lower.contains("enjoy the videos and music")
+                || lower.contains("share your videos with friends")
+                || lower.contains("직접 만든 콘텐츠를 업로드하여");
     }
 
     private ContentFetchResult fetchGithub(String url) {
@@ -232,8 +410,10 @@ public class ContentFetchService {
                 }
             }
 
-            // HTML 메타태그(og:type 등)에서 article 여부 판별
-            ContentType resolvedType = isArticlePage(doc, url) ? ContentType.ARTICLE : ContentType.OTHER;
+            // HTML 메타태그(og:type 등)에서 article 및 video 여부 판별
+            ContentType resolvedType = isArticlePage(doc, url) ? ContentType.ARTICLE
+                    : isVideoPage(doc) ? ContentType.VIDEO
+                    : ContentType.OTHER;
 
             return new ContentFetchResult(resolvedType, title, truncate(content, MAX_CONTENT_LENGTH));
         } catch (Exception e) {
@@ -258,6 +438,14 @@ public class ContentFetchService {
         }
         String ogType = getMetaTag(doc, "og:type");
         return ogType != null && ogType.toLowerCase().contains("article");
+    }
+
+    private boolean isVideoPage(Document doc) {
+        if (doc == null) {
+            return false;
+        }
+        String ogType = getMetaTag(doc, "og:type");
+        return ogType != null && ogType.toLowerCase().startsWith("video");
     }
 
     // --- 공통 헬퍼 메서드 ---
@@ -329,7 +517,9 @@ public class ContentFetchService {
         String lower = title.trim().toLowerCase();
         return lower.equals("msn") || lower.startsWith("msn ") || lower.startsWith("msn -")
                 || lower.equals("home") || lower.equals("naver") || lower.equals("daum")
-                || lower.equals("untitled") || lower.equals("홈") || lower.equals("메인");
+                || lower.equals("untitled") || lower.equals("홈") || lower.equals("메인")
+                || lower.equals("- youtube") || lower.equals("youtube")
+                || lower.equals("- vimeo") || lower.equals("vimeo");
     }
 
     private Document connect(String url) throws Exception {

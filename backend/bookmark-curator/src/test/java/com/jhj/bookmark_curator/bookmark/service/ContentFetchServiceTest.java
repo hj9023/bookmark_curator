@@ -82,6 +82,16 @@ class ContentFetchServiceTest {
         assertThat(result.content()).isEmpty();
     }
 
+    @Test
+    @DisplayName("동영상 파일 URL의 경우 확장자를 기반으로 VIDEO로 판별하고 파일명을 title로 반환한다")
+    void testVideoFileFetch() {
+        String videoUrl = "https://example.com/videos/sample-tutorial.mp4";
+        ContentFetchResult result = contentFetchService.fetch(videoUrl);
+        assertThat(result.contentType()).isEqualTo(ContentType.VIDEO);
+        assertThat(result.title()).isEqualTo("sample-tutorial.mp4");
+        assertThat(result.content()).contains("sample-tutorial.mp4");
+    }
+
     private void printResult(String label, String url, ContentFetchResult result) {
         System.out.println("==================================================");
         System.out.println("[" + label + " 테스트]");
