@@ -20,7 +20,6 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class BookmarkService {
 
     private final BookmarkRepository bookmarkRepository;
@@ -65,6 +64,7 @@ public class BookmarkService {
         return bookmarkRepository.search(contentType, normalizedTag, trimmedKeyword);
     }
 
+    @Transactional
     public Bookmark update(Long id, String title, String memo, ContentType contentType, List<String> tagNames) {
         Bookmark bookmark = bookmarkRepository.findById(id)
                 .orElseThrow(() -> new BookmarkNotFoundException(id));
@@ -76,6 +76,7 @@ public class BookmarkService {
         return bookmark;
     }
 
+    @Transactional
     public void delete(Long id) {
         Bookmark bookmark = bookmarkRepository.findById(id)
                 .orElseThrow(() -> new BookmarkNotFoundException(id));
@@ -94,7 +95,7 @@ public class BookmarkService {
         return url;
     }
 
-    private Set<Tag> resolveTags(Collection<String> tagNames) {
+    private synchronized Set<Tag> resolveTags(Collection<String> tagNames) {
         Set<Tag> resolvedTags = new HashSet<>();
         if (tagNames == null || tagNames.isEmpty()) {
             return resolvedTags;
@@ -107,8 +108,17 @@ public class BookmarkService {
             }
 
             Tag tag = tagRepository.findByName(normalized)
-                    .orElseGet(() -> tagRepository.save(new Tag(normalized)));
-            resolvedTags.add(tag);
+                    .orElseGet(() -> {
+                        try {
+                            return tagRepository.save(new Tag(normalized));
+                        } catch (Exception e) {
+                            // 동시 요청으로 이미 다른 스레드가 생성한 경우 재조회
+                            return tagRepository.findByName(normalized).orElse(null);
+                        }
+                    });
+            if (tag != null) {
+                resolvedTags.add(tag);
+            }
         }
         return resolvedTags;
     }

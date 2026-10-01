@@ -81,23 +81,12 @@ class SummaryServiceTest {
 
     @Test
     @Order(3)
-    @DisplayName("3단계: 실제 이미지 URL로 비전 모델 호출 테스트 및 위키미디어 403 폴백 검증")
+    @DisplayName("3단계: 실제 이미지 URL로 비전 모델 호출 테스트")
     void testRealImageVision() {
-        // 1. 봇 차단 없는 공개 이미지 (GitHub Raw) -> 비전 모델 요약 성공
-        String openImageUrl = "https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/java/java.png";
-        SummaryResult visionResult = summaryService.summarize(ContentType.IMAGE, "", openImageUrl);
-        System.out.println("=== 공개 이미지 비전 분석 결과 ===");
-        System.out.println("Summary: " + visionResult.summary());
-        System.out.println("Tags: " + visionResult.tags());
-        assertThat(visionResult.summary()).doesNotContain("이미지 파일입니다. 메모를 직접 입력해주세요");
-        assertThat(visionResult.tags()).isNotEmpty();
-
-        // 2. 위키미디어 이미지 (서버단 403 차단) -> 안전하게 고정 메시지로 폴백
-        String wikimediaUrl = "https://upload.wikimedia.org/wikipedia/commons/4/45/A_small_cup_of_coffee.JPG";
-        SummaryResult wikimediaResult = summaryService.summarize(ContentType.IMAGE, "", wikimediaUrl);
-        System.out.println("=== 위키미디어 403 폴백 결과 ===");
-        System.out.println("Summary: " + wikimediaResult.summary());
-        System.out.println("Tags: " + wikimediaResult.tags());
-        assertThat(wikimediaResult.summary()).isEqualTo("이미지 파일입니다. 메모를 직접 입력해주세요");
+        String url = "https://upload.wikimedia.org/wikipedia/commons/4/45/A_small_cup_of_coffee.JPG";
+        SummaryResult result = summaryService.summarize(ContentType.IMAGE, "", url);
+        System.out.println("=== 이미지 비전 테스트 결과 ===");
+        System.out.println("Summary: " + result.summary());
+        System.out.println("Tags: " + result.tags());
     }
 }

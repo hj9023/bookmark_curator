@@ -8,6 +8,7 @@ export default function BookmarkForm({ onBookmarkCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
